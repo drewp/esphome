@@ -80,7 +80,7 @@ uint8_t ILI9486Display::read_command(uint8_t command_byte, uint8_t index) {
 
 void ILI9486Display::update() {
   this->do_update_();
-  // this->display_();
+  this->display_();
 }
 
 void ILI9486Display::display_() {
@@ -157,27 +157,15 @@ void HOT ILI9486Display::draw_absolute_pixel_internal(int x, int y, Color color)
   if (x >= this->get_width_internal() || x < 0 || y >= this->get_height_internal() || y < 0)
     return;
 
-  this->command(ILI9486_CASET);
-  this->start_data_();
-  this->write_byte(x>>24);
-  this->write_byte(x>>16);
-  this->write_byte(x>>8);
-  this->write_byte(x);
-  this->end_data_();
-  this->command(ILI9486_PASET);
-  this->start_data_();
-  this->write_byte(y>>24);
-  this->write_byte(y>>16);
-  this->write_byte(y>>8);
-  this->write_byte(y);
-  this->end_data_();
+  // low and high watermark may speed up drawing from buffer
+  this->x_low_ = (x < this->x_low_) ? x : this->x_low_;
+  this->y_low_ = (y < this->y_low_) ? y : this->y_low_;
+  this->x_high_ = (x > this->x_high_) ? x : this->x_high_;
+  this->y_high_ = (y > this->y_high_) ? y : this->y_high_;
 
-  this->command(ILI9486_RAMWR);
-  this->start_data_();
+  uint32_t pos = (y * width_) + x;
   auto color565 = color.to_rgb_565();
-  this->write_byte(color565>>8);
-  this->write_byte(color565);
-  this->end_data_();
+  buffer_multiple_[DISPLAY_BUFFER_PART(pos)][DISPLAY_BUFFER_POS(pos)] = convert_to_8bit_color_(color565);
 }
 
 // should return the total size: return this->get_width_internal() * this->get_height_internal() * 2 // 16bit color
